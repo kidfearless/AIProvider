@@ -115,7 +115,7 @@ public abstract record Provider : IDisposable
             }
 
             using var chatClient =
-               new OpenAIClient(ApiKey)
+               new OpenAIClient(new(ApiKey!), Options)
                .GetChatClient(session.ChatModel.Model)
                .AsIChatClient()
                .AsBuilder()
