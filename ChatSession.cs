@@ -1,35 +1,27 @@
-﻿using AIProvider.Messages;
-
-using System.Text;
+﻿using System.Text;
 
 namespace AIProvider;
 
-public record ChatSession
+
+public abstract partial record Provider
 {
-    private readonly Func<ChatSession, CancellationToken, IAsyncEnumerable<Response>> streamAction;
-
-    public List<Message> Messages { get; set; } = [];
-    public int ShortTermMemoryLength { get; set; } = 20;
-    public Provider Provider { get; }
-    public ChatModel ChatModel { get; }
-
-    public ChatSession(Provider provider, ChatModel chatModel, Func<ChatSession, CancellationToken, IAsyncEnumerable<Response>> streamAction)
+    public record ChatSession(Provider Provider, ChatModel ChatModel)
     {
-        Provider = provider;
-        ChatModel = chatModel;
-        this.streamAction = streamAction;
-    }
+        public List<Messages.Message> Messages { get; set; } = [];
+        public int ShortTermMemoryLength { get; set; } = 20;
 
-    public IAsyncEnumerable<Response> StreamResponseAsync(CancellationToken cancellationToken = default) => streamAction(this, cancellationToken);
+        public IAsyncEnumerable<Response> StreamResponseAsync(CancellationToken cancellationToken = default) => Provider.StreamResponseAsync(this, cancellationToken);
+        public async Task<T> StructuredOutputAsync<T>(CancellationToken cancellationToken = default) => await Provider.StructuredOutputAsync<T>(this);
 
-    public async Task<Response> GetResponseAsync()
-    {
-        var builder = new StringBuilder(2048);
-        await foreach (var res in StreamResponseAsync())
+        public async Task<Response> GetResponseAsync()
         {
-            builder.Append(res.Content);
-        }
+            var builder = new StringBuilder(2048);
+            await foreach (var res in StreamResponseAsync())
+            {
+                builder.Append(res.Content);
+            }
 
-        return new Response(builder.ToString());
+            return new Response(builder.ToString());
+        }
     }
 }

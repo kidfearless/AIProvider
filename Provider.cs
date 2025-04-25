@@ -3,6 +3,7 @@
 using Anthropic;
 
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Options;
 
 using OpenAI;
 
@@ -11,6 +12,12 @@ using System.Linq;
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.Json.Nodes;
+using System.Text.Json;
+using System.Threading;
+
+using static System.Xml.Schema.XmlSchemaInference;
+using System.Diagnostics.CodeAnalysis;
 
 namespace AIProvider;
 
@@ -30,7 +37,7 @@ public class DevProxy : IWebProxy
 }
 
 
-public abstract record Provider : IDisposable
+public abstract partial record Provider : IDisposable
 {
     protected abstract string Key { get; }
     protected abstract string Url { get; }
@@ -40,10 +47,11 @@ public abstract record Provider : IDisposable
     public List<AITool> Tools { get; private set; } = [];
 
 
-    public virtual ChatSession CreateChatSession(ChatModel chatModel) => new(this, chatModel, StreamResponseAsync);
+    public virtual ChatSession CreateChatSession(ChatModel chatModel) => new ChatSession(this, chatModel);
     public abstract Task<List<ChatModel>> GetModelsAsync();
 
     protected abstract IAsyncEnumerable<Response> StreamResponseAsync(ChatSession session, CancellationToken cancellationToken);
+    protected abstract Task<T> StructuredOutputAsync<T>(ChatSession session);
 
     public virtual void Initialize(string apiKey)
     {
@@ -80,7 +88,7 @@ public abstract record Provider : IDisposable
     public record OpenAiProvider : Provider
     {
         protected override string Key => "OpenAI";
-        protected override string Url => "https://api.openai.com/v1/chat/";
+        protected override string Url => "https://api.openai.com/v1/";
         protected virtual OpenAI.OpenAIClientOptions Options => new() { Endpoint = new(Url) };
 
         public override void Initialize(string apiKey)
@@ -94,12 +102,58 @@ public abstract record Provider : IDisposable
                 throw new Exception("Provider not initialized");
             }
 
-            var client = new OpenAIClient(ApiKey)
+            var client = new OpenAIClient(new(ApiKey), Options)
               .GetOpenAIModelClient();
             var models = await client.GetModelsAsync();
             return models.Value.Select(m => new ChatModel(m.Id)).ToList();
         }
 
+        protected override async Task<T> StructuredOutputAsync<T>(ChatSession session)
+        {
+            if (!IsInitialized)
+            {
+                throw new Exception("Provider not initialized");
+            }
+
+            if (!session.Messages.Any())
+            {
+                throw new Exception("No messages to send");
+            }
+
+            using var chatClient =
+               new OpenAIClient(new(ApiKey!), Options)
+               .GetChatClient(session.ChatModel.Model)
+               .AsIChatClient()
+               .AsBuilder()
+               .UseFunctionInvocation()
+               .Build();
+
+
+            var messages = session.Messages.Select(m =>
+            {
+                return m switch
+                {
+                    AssistantMessage a => ConvertToChatMessage(a),
+                    SystemPromptMessage a => ConvertToChatMessage(a),
+                    UserMessage a => ConvertToChatMessage(a),
+                    Messages.Message a => ConvertToChatMessage(a),
+                    _ => throw new NotImplementedException()
+                };
+            })
+            .TakeLast(session.ShortTermMemoryLength + 1)
+            .ToList();
+
+
+
+            var chatOptions = new ChatOptions()
+            {
+                Tools = Tools,
+            };
+
+            var response = await chatClient.GetResponseAsync<T>(messages, chatOptions);
+
+            return response.TryGetResult(out var result) ? result : throw new Exception("Failed to get structured output");
+        }
 
 
         protected override async IAsyncEnumerable<Response> StreamResponseAsync(ChatSession session, [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -173,7 +227,7 @@ public abstract record Provider : IDisposable
     public record class AnthropicProvider : Provider
     {
         protected override string Key => "Anthropic";
-        protected override string Url => "https://api.anthropic.com/v1/messages";
+        protected override string Url => "https://api.anthropic.com/v1/";
 
         public override async Task<List<ChatModel>> GetModelsAsync()
         {
@@ -185,6 +239,94 @@ public abstract record Provider : IDisposable
             AnthropicClient client = new(ApiKey);
             var models = await client.ModelsListAsync();
             return models.Data.Select(m => new ChatModel(m.Id)).ToList();
+        }
+
+        [RequiresUnreferencedCode("serializer go brr")]
+        [RequiresDynamicCode("serializer go brr")]
+        protected override async Task<T> StructuredOutputAsync<T>(ChatSession session)
+        {
+            if (!IsInitialized)
+            {
+                throw new Exception("Provider not initialized");
+            }
+
+            if (!session.Messages.Any())
+            {
+                throw new Exception("No messages to send");
+            }
+
+            using var chatClient = new AnthropicClient(ApiKey!)
+               .AsBuilder()
+               .UseFunctionInvocation()
+               .Build();
+
+
+            var messages = session.Messages.Select(m =>
+            {
+                return m switch
+                {
+                    AssistantMessage a => ConvertToChatMessage(a),
+                    SystemPromptMessage a => ConvertToChatMessage(a),
+                    UserMessage a => ConvertToChatMessage(a),
+                    Messages.Message a => ConvertToChatMessage(a),
+                    _ => throw new NotImplementedException()
+                };
+            })
+            .TakeLast(session.ShortTermMemoryLength + 1)
+            .ToList();
+
+
+            var chatOptions = new ChatOptions()
+            {
+                Tools = Tools,
+                ModelId = session.ChatModel.Model
+            };
+
+
+            var response = await ChatClientStructuredOutputExtensions.GetResponseAsync<T>(chatClient, messages, chatOptions, useJsonSchema: false);
+
+
+            if (response.TryGetResult(out var result))
+            {
+                return result;
+            }
+
+            var jsonText = response.Text.GetCodeBlockOrText();
+            var jsonElement = JsonSerializer.Deserialize<T>(jsonText, JsonSerializerOptions.Web);
+            if (jsonElement is not null)
+            {
+                return jsonElement;
+            }
+
+            throw new Exception("Failed to deserialize response");
+
+        }
+
+        private static bool SchemaRepresentsObject(JsonElement schemaElement)
+        {
+            if (schemaElement.ValueKind == JsonValueKind.Object)
+            {
+                foreach (JsonProperty item in schemaElement.EnumerateObject())
+                {
+                    if (item.NameEquals("type"u8))
+                    {
+                        return item.Value.ValueKind == JsonValueKind.String && item.Value.ValueEquals("object"u8);
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static JsonNode? JsonElementToJsonNode(JsonElement element)
+        {
+            return element.ValueKind switch
+            {
+                JsonValueKind.Null => null,
+                JsonValueKind.Array => JsonArray.Create(element),
+                JsonValueKind.Object => JsonObject.Create(element),
+                _ => JsonValue.Create(element),
+            };
         }
         protected override async IAsyncEnumerable<Response> StreamResponseAsync(ChatSession session, [EnumeratorCancellation] CancellationToken cancellationToken)
         {
@@ -234,6 +376,17 @@ public abstract record Provider : IDisposable
                 }
             }
         }
-    }
 
+
+        protected ChatMessage ConvertToChatMessage(Messages.Message message) => new ChatMessage(new(message.Role), message.Content);
+        protected ChatMessage ConvertToChatMessage(AssistantMessage message) => new ChatMessage(ChatRole.Assistant, message.Content);
+        protected ChatMessage ConvertToChatMessage(SystemPromptMessage message) => new ChatMessage(ChatRole.System, message.Content);
+        protected ChatMessage ConvertToChatMessage(UserMessage message)
+        {
+            var chatMessage = new ChatMessage(ChatRole.User, message.Content);
+            message.Files.ForEach(chatMessage.Contents.Add);
+
+            return chatMessage;
+        }
+    }
 }

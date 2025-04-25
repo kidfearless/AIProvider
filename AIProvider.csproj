@@ -14,7 +14,7 @@
     <None Remove="CustomIMPL\**" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Anthropic" Version="3.4.0" />
+    <PackageReference Include="Anthropic" Version="3.4.2-dev.4" />
     <PackageReference Include="AnyOf" Version="0.5.0" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="9.4.0-preview.1.25207.5" />
     <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="9.4.0-preview.1.25207.5" />
