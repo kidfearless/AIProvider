@@ -102,7 +102,7 @@ public abstract partial record Provider : IDisposable
                 throw new Exception("Provider not initialized");
             }
 
-            var client = new OpenAIClient(new(ApiKey), Options)
+            var client = new OpenAIClient(new(ApiKey!), Options)
               .GetOpenAIModelClient();
             var models = await client.GetModelsAsync();
             return models.Value.Select(m => new ChatModel(m.Id)).ToList();
@@ -302,32 +302,6 @@ public abstract partial record Provider : IDisposable
 
         }
 
-        private static bool SchemaRepresentsObject(JsonElement schemaElement)
-        {
-            if (schemaElement.ValueKind == JsonValueKind.Object)
-            {
-                foreach (JsonProperty item in schemaElement.EnumerateObject())
-                {
-                    if (item.NameEquals("type"u8))
-                    {
-                        return item.Value.ValueKind == JsonValueKind.String && item.Value.ValueEquals("object"u8);
-                    }
-                }
-            }
-
-            return false;
-        }
-
-        private static JsonNode? JsonElementToJsonNode(JsonElement element)
-        {
-            return element.ValueKind switch
-            {
-                JsonValueKind.Null => null,
-                JsonValueKind.Array => JsonArray.Create(element),
-                JsonValueKind.Object => JsonObject.Create(element),
-                _ => JsonValue.Create(element),
-            };
-        }
         protected override async IAsyncEnumerable<Response> StreamResponseAsync(ChatSession session, [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             if (!IsInitialized || ApiKey is null)
