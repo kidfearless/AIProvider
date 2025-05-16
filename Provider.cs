@@ -3,39 +3,22 @@
 using Anthropic;
 
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Options;
 
 using OpenAI;
 
-using System.Collections.ObjectModel;
-using System.Linq;
-using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text;
-using System.Text.Json.Nodes;
 using System.Text.Json;
-using System.Threading;
 
-using static System.Xml.Schema.XmlSchemaInference;
 using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.Configuration;
+using System.ClientModel;
+using ChatMessage = Microsoft.Extensions.AI.ChatMessage;
+using System;
+using Microsoft.Extensions.Options;
+using static System.Xml.Schema.XmlSchemaInference;
 
 namespace AIProvider;
-
-public class DevProxy : IWebProxy
-{
-    public ICredentials? Credentials { get; set; }
-
-    public Uri? GetProxy(Uri destination)
-    {
-        throw new NotImplementedException();
-    }
-
-    public bool IsBypassed(Uri host)
-    {
-        throw new NotImplementedException();
-    }
-}
-
 
 public abstract partial record Provider : IDisposable
 {
@@ -45,6 +28,7 @@ public abstract partial record Provider : IDisposable
     protected string? ApiKey { get; set; }
     protected bool IsInitialized { get; set; }
     public List<AITool> Tools { get; private set; } = [];
+    protected IConfiguration? Configuration { get; set; }
 
 
     public virtual ChatSession CreateChatSession(ChatModel chatModel) => new ChatSession(this, chatModel);
@@ -53,32 +37,30 @@ public abstract partial record Provider : IDisposable
     protected abstract IAsyncEnumerable<Response> StreamResponseAsync(ChatSession session, CancellationToken cancellationToken);
     protected abstract Task<T> StructuredOutputAsync<T>(ChatSession session);
 
-    public virtual void Initialize(string apiKey)
+    public virtual void Initialize(string apiKey, IConfiguration? options = null)
     {
         ApiKey = apiKey;
-        if (ApiKey is null or "")
-        {
-            throw new Exception("API key not set");
-        }
+        Configuration = options;
 
         IsInitialized = true;
     }
 
-    public virtual void LoadTools(List<AITool> tools) => Tools = tools;
-
-    public static Provider GetProvider(string key, string apiKey)
+    public static Provider GetProvider(string key, string apiKey, IConfiguration? options = null)
     {
         Provider provider = key switch
         {
             "OpenAI" => new OpenAiProvider(),
             "Anthropic" => new AnthropicProvider(),
             "Gemini" => new GeminiProvider(),
+            "AzureOpenAI" => new AzureProvider(),
             _ => throw new Exception("Invalid provider")
         };
 
-        provider.Initialize(apiKey);
+        provider.Initialize(apiKey, options);
         return provider;
     }
+
+    public virtual void LoadTools(List<AITool> tools) => Tools = tools;
 
     public void Dispose()
     {
@@ -87,14 +69,27 @@ public abstract partial record Provider : IDisposable
 
     public record OpenAiProvider : Provider
     {
-        protected override string Key => "OpenAI";
-        protected override string Url => "https://api.openai.com/v1/";
-        protected virtual OpenAI.OpenAIClientOptions Options => new() { Endpoint = new(Url) };
+        private string _url = "https://api.openai.com/v1/";
 
-        public override void Initialize(string apiKey)
+        protected override string Key => "OpenAI";
+        protected override string Url => _url;
+        protected virtual OpenAI.OpenAIClientOptions Options => new() { Endpoint = new(Url) };
+        protected virtual ApiKeyCredential Auth => new(ApiKey!);
+
+        public override void Initialize(string apiKey, IConfiguration? options = null)
         {
-            base.Initialize(apiKey);
+            base.Initialize(apiKey, options);
+            if (options != null)
+            {
+                var url = options[$"Provider:{Key}:Url"];
+                if (url is not null or "")
+                {
+                    _url = url;
+                }
+            }
         }
+
+
         public override async Task<List<ChatModel>> GetModelsAsync()
         {
             if (!IsInitialized)
@@ -102,7 +97,7 @@ public abstract partial record Provider : IDisposable
                 throw new Exception("Provider not initialized");
             }
 
-            var client = new OpenAIClient(new(ApiKey!), Options)
+            var client = new OpenAIClient(Auth, Options)
               .GetOpenAIModelClient();
             var models = await client.GetModelsAsync();
             return models.Value.Select(m => new ChatModel(m.Id)).ToList();
@@ -121,7 +116,7 @@ public abstract partial record Provider : IDisposable
             }
 
             using var chatClient =
-               new OpenAIClient(new(ApiKey!), Options)
+               new OpenAIClient(Auth, Options)
                .GetChatClient(session.ChatModel.Model)
                .AsIChatClient()
                .AsBuilder()
@@ -148,6 +143,7 @@ public abstract partial record Provider : IDisposable
             var chatOptions = new ChatOptions()
             {
                 Tools = Tools,
+                MaxOutputTokens = (int?)session.MaxOutputTokens
             };
 
             var response = await chatClient.GetResponseAsync<T>(messages, chatOptions);
@@ -169,7 +165,7 @@ public abstract partial record Provider : IDisposable
             }
 
             using var chatClient =
-               new OpenAIClient(new(ApiKey!), Options)
+               new OpenAIClient(Auth, Options)
                .GetChatClient(session.ChatModel.Model)
                .AsIChatClient()
                .AsBuilder()
@@ -195,7 +191,8 @@ public abstract partial record Provider : IDisposable
 
             var chatOptions = new ChatOptions()
             {
-                Tools = Tools
+                Tools = Tools,
+                MaxOutputTokens = (int?)session.MaxOutputTokens
             };
 
             var response = await chatClient.GetResponseAsync(messages, chatOptions, cancellationToken: cancellationToken);
@@ -204,12 +201,12 @@ public abstract partial record Provider : IDisposable
             yield return new Response(response.Text);
         }
 
-        protected ChatMessage ConvertToChatMessage(Messages.Message message) => new ChatMessage(new(message.Role), message.Content);
-        protected ChatMessage ConvertToChatMessage(AssistantMessage message) => new ChatMessage(ChatRole.Assistant, message.Content);
-        protected ChatMessage ConvertToChatMessage(SystemPromptMessage message) => new ChatMessage(ChatRole.System, message.Content);
-        protected ChatMessage ConvertToChatMessage(UserMessage message)
+        protected ChatMessage ConvertToChatMessage(Messages.Message message) => new Microsoft.Extensions.AI.ChatMessage(new(message.Role), message.Content);
+        protected Microsoft.Extensions.AI.ChatMessage ConvertToChatMessage(Messages.AssistantMessage message) => new Microsoft.Extensions.AI.ChatMessage(ChatRole.Assistant, message.Content);
+        protected Microsoft.Extensions.AI.ChatMessage ConvertToChatMessage(Messages.SystemPromptMessage message) => new Microsoft.Extensions.AI.ChatMessage(ChatRole.System, message.Content);
+        protected Microsoft.Extensions.AI.ChatMessage ConvertToChatMessage(Messages.UserMessage message)
         {
-            var chatMessage = new ChatMessage(ChatRole.User, message.Content);
+            var chatMessage = new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, message.Content);
             message.Files.ForEach(chatMessage.Contents.Add);
 
             return chatMessage;
@@ -231,7 +228,7 @@ public abstract partial record Provider : IDisposable
 
         public override async Task<List<ChatModel>> GetModelsAsync()
         {
-            if (!IsInitialized || ApiKey is null)
+            if (!IsInitialized)
             {
                 throw new Exception("Provider not initialized");
             }
@@ -292,7 +289,7 @@ public abstract partial record Provider : IDisposable
             }
 
             var jsonText = response.Text.GetCodeBlockOrText();
-            var jsonElement = JsonSerializer.Deserialize<T>(jsonText, JsonSerializerOptions.Web);
+            var jsonElement = System.Text.Json.JsonSerializer.Deserialize<T>(jsonText, JsonSerializerOptions.Web);
             if (jsonElement is not null)
             {
                 return jsonElement;
@@ -326,10 +323,21 @@ public abstract partial record Provider : IDisposable
 
             var systemMessage = session.Messages.OfType<SystemPromptMessage>().FirstOrDefault()?.Content ?? "";
             var thinking = session.ChatModel.Model.Contains("claude-3-7-sonnet");
+
+            int maxTokens = 8192;
+            if (session.MaxOutputTokens.HasValue)
+            {
+                maxTokens = Math.Min(8192, (int)session.MaxOutputTokens.Value);
+            }
+
+            if (session.ChatModel.Model.Contains("haiku"))
+            {
+                maxTokens = Math.Min(4096, maxTokens);
+            }
             var request = new CreateMessageParams()
             {
                 Model = session.ChatModel.Model,
-                MaxTokens = session.ChatModel.Model.Contains("haiku") ? 4096 : 8192,
+                MaxTokens = maxTokens,
                 System = systemMessage,
                 Thinking = thinking ? new() { Enabled = new(1025, ThinkingConfigEnabledType.Enabled) } : null,
                 Temperature = 1,
@@ -363,4 +371,5 @@ public abstract partial record Provider : IDisposable
             return chatMessage;
         }
     }
+
 }

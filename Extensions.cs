@@ -1,5 +1,8 @@
-﻿using ModelContextProtocol.Protocol.Types;
+﻿using AIProvider.Messages;
 
+using ModelContextProtocol.Protocol.Types;
+
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 
 namespace AIProvider;
@@ -16,6 +19,24 @@ public static class Extensions
             return match.Groups[1].Value.Trim();
         }
         return content!.Trim();
+    }
+
+    public static List<Message> AddSystemPrompt(this List<Message> messages, string prompt)
+    {
+        messages.Add(new Messages.SystemPromptMessage(prompt));
+        return messages;
+    }
+
+    public static List<Message> AddUserMessage(this List<Message> messages, string content)
+    {
+        messages.Add(new Messages.UserMessage(content));
+        return messages;
+    }
+
+    public static List<Message> AddAssistantMessage(this List<Message> messages, string content)
+    {
+        messages.Add(new Messages.AssistantMessage(content));
+        return messages;
     }
 
 }

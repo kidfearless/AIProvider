@@ -387,12 +387,11 @@ internal sealed partial class OpenAIChatClient : IChatClient
     {
 
         // Create the return message.
-        ChatMessage returnMessage = new()
-        {
-            MessageId = openAICompletion.Id, // There's no per-message ID, so we use the same value as the response ID
-            RawRepresentation = openAICompletion,
-            Role = FromOpenAIChatRole(openAICompletion.Role),
-        };
+        ChatMessage returnMessage = new ChatMessage();
+        returnMessage.MessageId = openAICompletion.Id; // There's no per-message ID, so we use the same value as the response ID
+        returnMessage.RawRepresentation = openAICompletion;
+        returnMessage.Role = openAICompletion?.Role != null ? FromOpenAIChatRole(openAICompletion.Role) : ChatRole.Assistant;
+
 
         // Populate its content from those in the OpenAI response content.
         foreach (var contentPart in openAICompletion.Content)

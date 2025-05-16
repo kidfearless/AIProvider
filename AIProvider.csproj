@@ -25,5 +25,9 @@
 
     <PackageReference Include="ModelContextProtocol" Version="0.1.0-preview.8" />
 
+    <PackageReference Include="Azure.AI.OpenAI" Version="2.1.0" />
+    <PackageReference Include="Azure.Core" Version="1.46.0" />
+    <PackageReference Include="Newtonsoft.Json.Schema" Version="4.0.1" />
+
   </ItemGroup>
 </Project>
