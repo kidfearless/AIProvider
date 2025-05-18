@@ -14,6 +14,6 @@ public record UserMessage(string Content) : Message(Content)
 
     public UserMessage WithFile(DataContent content)
     {
-        return this with { Files = [content] };
+        return this with { Files = [.. this.Files, content] };
     }
 }
