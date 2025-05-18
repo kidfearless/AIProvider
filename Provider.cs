@@ -195,10 +195,17 @@ public abstract partial record Provider : IDisposable
                 MaxOutputTokens = (int?)session.MaxOutputTokens
             };
 
-            var response = await chatClient.GetResponseAsync(messages, chatOptions, cancellationToken: cancellationToken);
-
-            var builder = new StringBuilder(2048);
-            yield return new Response(response.Text);
+            var stream = chatClient.GetStreamingResponseAsync(messages, chatOptions, cancellationToken: cancellationToken);
+            await foreach (var message in stream)
+            {
+                foreach (var contentPart in message.Contents.OfType<TextContent>())
+                {
+                    if (contentPart.Text != null)
+                    {
+                        yield return new(contentPart.Text);
+                    }
+                }
+            }
         }
 
         protected ChatMessage ConvertToChatMessage(Messages.Message message) => new Microsoft.Extensions.AI.ChatMessage(new(message.Role), message.Content);
