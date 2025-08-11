@@ -138,8 +138,12 @@ public abstract partial record Provider
             JsonElement jsonElement = AIJsonUtilities.CreateJsonSchema(typeof(T), null, hasDefaultValue: false, null, serializerOptions, new AIJsonSchemaCreateOptions
             {
                 IncludeSchemaKeyword = true,
-                DisallowAdditionalProperties = true,
-                IncludeTypeInEnumSchemas = true
+                TransformOptions = new AIJsonSchemaTransformOptions()
+                {
+                  DisallowAdditionalProperties = true,
+                }
+                //DisallowAdditionalProperties = true,
+                //IncludeTypeInEnumSchemas = true
             });
             bool isWrappedInObject;
             JsonElement jsonElement2;

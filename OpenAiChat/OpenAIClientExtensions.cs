@@ -22,16 +22,17 @@ public static class OpenAIClientExtensions
     public static IChatClient AsIChatClient(this ChatClient chatClient) =>
         new OpenAIChatClient(chatClient);
 
-    /// <summary>Gets an <see cref="IChatClient"/> for use with this <see cref="OpenAIResponseClient"/>.</summary>
-    /// <param name="responseClient">The client.</param>
-    /// <returns>An <see cref="IChatClient"/> that can be used to converse via the <see cref="OpenAIResponseClient"/>.</returns>
-    public static IChatClient AsIChatClient(this OpenAIResponseClient responseClient) =>
+  /// <summary>Gets an <see cref="IChatClient"/> for use with this <see cref="OpenAIResponseClient"/>.</summary>
+  /// <param name="responseClient">The client.</param>
+  /// <returns>An <see cref="IChatClient"/> that can be used to converse via the <see cref="OpenAIResponseClient"/>.</returns>
+#pragma warning disable OPENAI001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+  public static IChatClient AsIChatClient(this OpenAIResponseClient responseClient) =>
         new OpenAIResponseChatClient(responseClient);
 
-    /// <summary>Gets an <see cref="ISpeechToTextClient"/> for use with this <see cref="AudioClient"/>.</summary>
-    /// <param name="audioClient">The client.</param>
-    /// <returns>An <see cref="ISpeechToTextClient"/> that can be used to transcribe audio via the <see cref="AudioClient"/>.</returns>
-    [Experimental("MEAI001")]
+  /// <summary>Gets an <see cref="ISpeechToTextClient"/> for use with this <see cref="AudioClient"/>.</summary>
+  /// <param name="audioClient">The client.</param>
+  /// <returns>An <see cref="ISpeechToTextClient"/> that can be used to transcribe audio via the <see cref="AudioClient"/>.</returns>
+  [Experimental("MEAI001")]
     public static ISpeechToTextClient AsISpeechToTextClient(this AudioClient audioClient) =>
         new OpenAISpeechToTextClient(audioClient);
 

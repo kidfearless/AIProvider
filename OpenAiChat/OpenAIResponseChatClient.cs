@@ -1,3 +1,4 @@
+#pragma warning disable OPENAI001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
@@ -132,7 +133,7 @@ internal sealed partial class OpenAIResponseChatClient : IChatClient
 
             if (openAIResponse.Error is { } error)
             {
-                message.Contents.Add(new ErrorContent(error.Message) { ErrorCode = error.Code });
+                message.Contents.Add(new ErrorContent(error.Message) { ErrorCode = error.Code.ToString() });
             }
         }
 
@@ -300,7 +301,7 @@ internal sealed partial class OpenAIResponseChatClient : IChatClient
         {
             // Handle strongly-typed properties.
             result.MaxOutputTokenCount = options.MaxOutputTokens;
-            result.PreviousResponseId = options.ChatThreadId;
+            result.PreviousResponseId = options.ConversationId;
             result.TopP = options.TopP;
             result.Temperature = options.Temperature;
 
@@ -358,23 +359,7 @@ internal sealed partial class OpenAIResponseChatClient : IChatClient
                             var functionParameters = BinaryData.FromBytes(JsonSerializer.SerializeToUtf8Bytes(oaitool, ResponseClientJsonContext.Default.ResponseToolJson));
                             result.Tools.Add(ResponseTool.CreateFunctionTool(af.Name, af.Description, functionParameters));
                             break;
-
-                        case HostedWebSearchTool:
-                            WebSearchToolLocation? location = null;
-                            if (tool.AdditionalProperties.TryGetValue(nameof(WebSearchToolLocation), out var objLocation))
-                            {
-                                location = objLocation as WebSearchToolLocation;
-                            }
-
-                            WebSearchToolContextSize? size = null;
-                            if (tool.AdditionalProperties.TryGetValue(nameof(WebSearchToolContextSize), out var objSize) &&
-                                objSize is WebSearchToolContextSize)
-                            {
-                                size = (WebSearchToolContextSize)objSize;
-                            }
-
-                            result.Tools.Add(ResponseTool.CreateWebSearchTool(location, size));
-                            break;
+                       
                     }
                 }
 

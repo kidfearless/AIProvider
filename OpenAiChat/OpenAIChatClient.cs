@@ -116,11 +116,13 @@ internal sealed partial class OpenAIChatClient : IChatClient
                 input.Role == ChatRoleDeveloper)
             {
                 var parts = ToOpenAIChatContent(input.Contents);
-                yield return
+#pragma warning disable OPENAI001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+        yield return
                     input.Role == ChatRole.System ? new SystemChatMessage(parts) { ParticipantName = input.AuthorName } :
                     input.Role == ChatRoleDeveloper ? new DeveloperChatMessage(parts) { ParticipantName = input.AuthorName } :
                     new UserChatMessage(parts) { ParticipantName = input.AuthorName };
-            }
+#pragma warning restore OPENAI001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+      }
             else if (input.Role == ChatRole.Tool)
             {
                 foreach (var item in input.Contents)
@@ -199,8 +201,9 @@ internal sealed partial class OpenAIChatClient : IChatClient
                     var audioData = BinaryData.FromBytes(dataContent.Data);
                     if (dataContent.MediaType.Equals("audio/mpeg", StringComparison.OrdinalIgnoreCase))
                     {
-                        parts.Add(ChatMessageContentPart.CreateInputAudioPart(audioData, ChatInputAudioFormat.Mp3));
-                    }
+#pragma warning disable OPENAI001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+            parts.Add(ChatMessageContentPart.CreateInputAudioPart(audioData, ChatInputAudioFormat.Mp3));
+          }
                     else if (dataContent.MediaType.Equals("audio/wav", StringComparison.OrdinalIgnoreCase))
                     {
                         parts.Add(ChatMessageContentPart.CreateInputAudioPart(audioData, ChatInputAudioFormat.Wav));
@@ -516,8 +519,9 @@ internal sealed partial class OpenAIChatClient : IChatClient
                 {
                     result.AllowParallelToolCalls = allowParallelToolCalls;
                 }
+#pragma warning disable OPENAI001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 
-                if (additionalProperties.TryGetValue(nameof(result.AudioOptions), out ChatAudioOptions? audioOptions))
+        if (additionalProperties.TryGetValue(nameof(result.AudioOptions), out ChatAudioOptions? audioOptions))
                 {
                     result.AudioOptions = audioOptions;
                 }
