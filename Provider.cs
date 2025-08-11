@@ -42,6 +42,7 @@ public abstract partial record Provider : IDisposable
             "Anthropic" => new AnthropicProvider(),
             "Gemini" => new GeminiProvider(),
             "AzureOpenAI" => new AzureProvider(),
+            "Groq" => new GroqProvider(),
             _ => throw new Exception("Invalid provider")
         };
 
