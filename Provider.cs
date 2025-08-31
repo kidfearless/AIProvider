@@ -52,9 +52,8 @@ public abstract partial record Provider : IDisposable
 
     public virtual void LoadTools(List<AITool> tools) => Tools = tools;
 
-    public void Dispose()
+    public virtual void Dispose()
     {
-        throw new NotImplementedException();
     }
 
 }
