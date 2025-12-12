@@ -230,7 +230,7 @@ internal sealed partial class OpenAIResponseChatClient : IChatClient
                         _ = functionCallInfos.Remove(functionCallOutputDoneUpdate.OutputIndex);
 
                         var fci = FunctionCallContent.CreateFromParsedArguments(
-                            callInfo.Arguments?.ToString() ?? string.Empty,
+                            callInfo.Arguments?.ToString() ?? "",
                             callInfo.ResponseItem.CallId,
                             callInfo.ResponseItem.FunctionName,
                             static json => JsonSerializer.Deserialize(json, ResponseClientJsonContext.Default.IDictionaryStringObject)!);
@@ -454,7 +454,7 @@ internal sealed partial class OpenAIResponseChatClient : IChatClient
                                 }
                             }
 
-                            yield return ResponseItem.CreateFunctionCallOutputItem(resultContent.CallId, result ?? string.Empty);
+                            yield return ResponseItem.CreateFunctionCallOutputItem(resultContent.CallId, result ?? "");
                             break;
                     }
                 }
@@ -553,7 +553,7 @@ internal sealed partial class OpenAIResponseChatClient : IChatClient
 
         if (parts.Count == 0)
         {
-            parts.Add(ResponseContentPart.CreateInputTextPart(string.Empty));
+            parts.Add(ResponseContentPart.CreateInputTextPart(""));
         }
 
         return parts;

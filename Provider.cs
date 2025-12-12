@@ -3,6 +3,7 @@
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using System.Diagnostics.CodeAnalysis;
 
 using static System.Xml.Schema.XmlSchemaInference;
 using static AIProvider.Provider;
@@ -24,6 +25,8 @@ public abstract partial record Provider : IDisposable
     public abstract Task<List<ChatModel>> GetModelsAsync();
 
     protected abstract IAsyncEnumerable<Response> StreamResponseAsync(ChatSession session, CancellationToken cancellationToken);
+    [RequiresUnreferencedCode("serializer go brr")]
+    [RequiresDynamicCode("serializer go brr")]
     protected abstract Task<T> StructuredOutputAsync<T>(ChatSession session);
 
     public virtual void Initialize(string apiKey, IConfiguration? options = null)

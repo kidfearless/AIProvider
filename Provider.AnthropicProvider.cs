@@ -27,6 +27,11 @@ public abstract partial record Provider
                 throw new Exception("Provider not initialized");
             }
 
+            if (ApiKey is null)
+            {
+                throw new Exception("Provider not initialized");
+            }
+
             AnthropicClient client = new(ApiKey);
             var models = await client.ModelsListAsync();
             return models.Data.Select(m => new ChatModel(m.Id)).ToList();
@@ -46,7 +51,8 @@ public abstract partial record Provider
                 throw new Exception("No messages to send");
             }
 
-            using var chatClient = new AnthropicClient(ApiKey!)
+                var apiKey = ApiKey!;
+                using var chatClient = new AnthropicClient(apiKey)
                .AsBuilder()
                .UseFunctionInvocation()
                .Build();

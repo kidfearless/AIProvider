@@ -16,6 +16,7 @@ using System.Reflection;
 using OpenAI.Chat;
 using Newtonsoft.Json.Schema;
 using Newtonsoft.Json;
+using System.Diagnostics.CodeAnalysis;
 
 namespace AIProvider;
 
@@ -95,6 +96,8 @@ public abstract partial record Provider
             return new Response(joined);
         }
 
+        [RequiresUnreferencedCode("serializer go brr")]
+        [RequiresDynamicCode("serializer go brr")]
         protected override async Task<T> StructuredOutputAsync<T>(ChatSession session)
         {
             if (!IsInitialized)
@@ -145,16 +148,13 @@ public abstract partial record Provider
                 //DisallowAdditionalProperties = true,
                 //IncludeTypeInEnumSchemas = true
             });
-            bool isWrappedInObject;
             JsonElement jsonElement2;
             if (SchemaRepresentsObject(jsonElement))
             {
-                isWrappedInObject = false;
                 jsonElement2 = jsonElement;
             }
             else
             {
-                isWrappedInObject = true;
                 JsonObject obj = new JsonObject
                 {
                     { "$schema", "https://json-schema.org/draft/2020-12/schema" },
@@ -172,8 +172,9 @@ public abstract partial record Provider
                         (JsonNode)false
                     }
                 };
-                JsonNode reference = "data";
-                obj.Add("required", new JsonArray(new ReadOnlySpan<JsonNode>(ref reference)));
+                JsonNode? reference = JsonValue.Create("data");
+                var arr = new JsonArray(reference);
+                obj.Add("required", arr);
                 jsonElement2 = System.Text.Json.JsonSerializer.SerializeToElement(obj, AIJsonUtilities.DefaultOptions.GetTypeInfo(typeof(JsonObject)));
             }
             options = ((options != null) ? options : new ChatCompletionOptions());

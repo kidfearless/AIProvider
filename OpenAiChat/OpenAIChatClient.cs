@@ -142,7 +142,7 @@ internal sealed partial class OpenAIChatClient : IChatClient
                             }
                         }
 
-                        yield return new ToolChatMessage(resultContent.CallId, result ?? string.Empty);
+                        yield return new ToolChatMessage(resultContent.CallId, result ?? "");
                     }
                 }
             }
@@ -221,7 +221,7 @@ internal sealed partial class OpenAIChatClient : IChatClient
 
         if (parts.Count == 0)
         {
-            parts.Add(ChatMessageContentPart.CreateTextPart(string.Empty));
+            parts.Add(ChatMessageContentPart.CreateTextPart(""));
         }
 
         return parts;
@@ -362,7 +362,7 @@ internal sealed partial class OpenAIChatClient : IChatClient
                 if (!string.IsNullOrWhiteSpace(fci.Name))
                 {
                     var callContent = ParseCallContentFromJsonString(
-                        fci.Arguments?.ToString() ?? string.Empty,
+                        fci.Arguments?.ToString() ?? "",
                         fci.CallId!,
                         fci.Name!);
                     responseUpdate.Contents.Add(callContent);
@@ -397,16 +397,20 @@ internal sealed partial class OpenAIChatClient : IChatClient
 
 
         // Populate its content from those in the OpenAI response content.
-        foreach (var contentPart in openAICompletion.Content)
+    var completionContent = openAICompletion?.Content;
+    if (completionContent != null && completionContent.Count > 0)
         {
-            if (ToAIContent(contentPart) is AIContent aiContent)
+            foreach (var contentPart in completionContent)
             {
-                returnMessage.Contents.Add(aiContent);
+                if (ToAIContent(contentPart) is AIContent aiContent)
+                {
+                    returnMessage.Contents.Add(aiContent);
+                }
             }
         }
 
-        // Output audio is handled separately from message content parts.
-        if (openAICompletion.OutputAudio is ChatOutputAudio audio)
+    // Output audio is handled separately from message content parts.
+    if (openAICompletion is not null && openAICompletion.OutputAudio is ChatOutputAudio audio)
         {
             var mimeType = chatCompletionOptions?.AudioOptions?.OutputAudioFormat.ToString()?.ToLowerInvariant() switch
             {
@@ -437,7 +441,7 @@ internal sealed partial class OpenAIChatClient : IChatClient
         }
 
         // Also manufacture function calling content items from any tool calls in the response.
-        if (options?.Tools is { Count: > 0 })
+        if (options?.Tools is { Count: > 0 } && openAICompletion is not null)
         {
             foreach (var toolCall in openAICompletion.ToolCalls)
             {
@@ -454,34 +458,34 @@ internal sealed partial class OpenAIChatClient : IChatClient
         // Wrap the content in a ChatResponse to return.
         var response = new ChatResponse(returnMessage)
         {
-            CreatedAt = openAICompletion.CreatedAt,
-            FinishReason = FromOpenAIFinishReason(openAICompletion.FinishReason),
-            ModelId = openAICompletion.Model,
-            RawRepresentation = openAICompletion,
-            ResponseId = openAICompletion.Id,
+            CreatedAt = openAICompletion?.CreatedAt,
+            FinishReason = FromOpenAIFinishReason(openAICompletion?.FinishReason),
+            ModelId = openAICompletion?.Model,
+            RawRepresentation = openAICompletion!,
+            ResponseId = openAICompletion?.Id,
         };
 
-        if (openAICompletion.Usage is ChatTokenUsage tokenUsage)
+        if (openAICompletion is not null && openAICompletion.Usage is ChatTokenUsage tokenUsage)
         {
             response.Usage = FromOpenAIUsage(tokenUsage);
         }
 
-        if (openAICompletion.ContentTokenLogProbabilities is { Count: > 0 } contentTokenLogProbs)
+        if (openAICompletion is not null && openAICompletion.ContentTokenLogProbabilities is { Count: > 0 } contentTokenLogProbs)
         {
             (response.AdditionalProperties ??= [])[nameof(openAICompletion.ContentTokenLogProbabilities)] = contentTokenLogProbs;
         }
 
-        if (openAICompletion.Refusal is string refusal)
+        if (openAICompletion is not null && openAICompletion.Refusal is string refusal)
         {
             (response.AdditionalProperties ??= [])[nameof(openAICompletion.Refusal)] = refusal;
         }
 
-        if (openAICompletion.RefusalTokenLogProbabilities is { Count: > 0 } refusalTokenLogProbs)
+        if (openAICompletion is not null && openAICompletion.RefusalTokenLogProbabilities is { Count: > 0 } refusalTokenLogProbs)
         {
             (response.AdditionalProperties ??= [])[nameof(openAICompletion.RefusalTokenLogProbabilities)] = refusalTokenLogProbs;
         }
 
-        if (openAICompletion.SystemFingerprint is string systemFingerprint)
+        if (openAICompletion is not null && openAICompletion.SystemFingerprint is string systemFingerprint)
         {
             (response.AdditionalProperties ??= [])[nameof(openAICompletion.SystemFingerprint)] = systemFingerprint;
         }

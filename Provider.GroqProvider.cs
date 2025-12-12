@@ -89,7 +89,7 @@ public abstract partial record Provider
       };
 
       var response = await chatClient.GetResponseAsync(messages, chatOptions);
-      return new Response(response.Text ?? string.Empty);
+      return new Response(response.Text ?? "");
     }
 
     protected override async IAsyncEnumerable<Response> StreamResponseAsync(ChatSession session, [EnumeratorCancellation] CancellationToken cancellationToken)

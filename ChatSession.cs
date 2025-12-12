@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using System.Diagnostics.CodeAnalysis;
 
 namespace AIProvider;
 
@@ -12,7 +13,9 @@ public abstract partial record Provider
         public ulong? MaxOutputTokens { get; set; }
 
         public IAsyncEnumerable<Response> StreamResponseAsync(CancellationToken cancellationToken = default) => Provider.StreamResponseAsync(this, cancellationToken);
-        public async Task<T> StructuredOutputAsync<T>(CancellationToken cancellationToken = default) => await Provider.StructuredOutputAsync<T>(this);
+    [RequiresUnreferencedCode("serializer go brr")]
+    [RequiresDynamicCode("serializer go brr")]
+    public async Task<T> StructuredOutputAsync<T>(CancellationToken cancellationToken = default) => await Provider.StructuredOutputAsync<T>(this);
 
         public virtual async Task<Response> GetResponseAsync()
         {

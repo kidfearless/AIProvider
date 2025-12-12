@@ -8,6 +8,7 @@ using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Configuration;
 using System.ClientModel;
 using ChatMessage = Microsoft.Extensions.AI.ChatMessage;
+using System.Diagnostics.CodeAnalysis;
 
 namespace AIProvider;
 
@@ -49,7 +50,9 @@ public abstract partial record Provider
             return models.Value.Select(m => new ChatModel(m.Id)).ToList();
         }
 
-        protected override async Task<T> StructuredOutputAsync<T>(ChatSession session)
+    [RequiresUnreferencedCode("serializer go brr")]
+    [RequiresDynamicCode("serializer go brr")]
+    protected override async Task<T> StructuredOutputAsync<T>(ChatSession session)
         {
             if (!IsInitialized)
             {
